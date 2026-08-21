@@ -1,0 +1,62 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Python model and vector-search artifacts
+python-detection/data/*.faiss
+python-detection/data/*.faiss.meta.json
+python-detection/data/models/
+*.safetensors
+*.bin
+
+# Node dependencies and build output
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.vite/
+
+# Runtime logs and local databases
+*.log
+logs/
+mongodb-data/
+
+# Docker overrides and local volumes
+docker-compose.override.yml
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary archives and generated files
+*.zip
+*.tar
+*.tar.gz
+tmp/
+temp/
