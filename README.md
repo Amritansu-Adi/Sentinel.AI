@@ -17,7 +17,7 @@
 
 **Intercept · Detect · Score · Sanitize · Protect**
 
-**[Explore the open-source project docs]([docs/index.html](https://sentinel-ai-web-tau.vercel.app/))** - customize policies, add detectors, and contribute extensions.
+**[Explore the open-source project docs]([https://sentinel-ai-web-tau.vercel.app/])** - customize policies, add detectors, and contribute extensions.
 
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat-square\&logo=node.js\&logoColor=white)](https://nodejs.org/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square\&logo=python\&logoColor=white)](https://python.org/)
