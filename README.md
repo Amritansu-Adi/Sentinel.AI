@@ -17,6 +17,8 @@
 
 **Intercept · Detect · Score · Sanitize · Protect**
 
+**[Explore the open-source project docs](docs/index.html)** - customize policies, add detectors, and contribute extensions.
+
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat-square\&logo=node.js\&logoColor=white)](https://nodejs.org/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square\&logo=python\&logoColor=white)](https://python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat-square\&logo=fastapi)](https://fastapi.tiangolo.com/)
