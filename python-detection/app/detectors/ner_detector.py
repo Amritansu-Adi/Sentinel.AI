@@ -25,6 +25,7 @@ text; this is enforced by construction — the module contains no logging
 calls at all.
 """
 
+import os
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -57,7 +58,10 @@ _LABEL_MAP = {
     "LOC": "LOCATION",
 }
 
-_MODEL_NAME = "dslim/bert-base-NER"
+# Task 7.5: was hardcoded despite NER_MODEL_NAME being spec'd in
+# project.md's env table since Phase 0 — now actually read via os.getenv,
+# same "wire it for real" precedent Task 3.3 set for VECTOR_MODEL_NAME.
+_MODEL_NAME = os.getenv("NER_MODEL_NAME", "dslim/bert-base-NER")
 
 # --------------------------------------------------------------------------
 # Model loading is lazy (first-call singleton), not import-time. Two

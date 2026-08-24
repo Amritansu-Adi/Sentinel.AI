@@ -28,11 +28,22 @@ if Ollama is unreachable — not caught here, so it currently propagates to
 a 500 from `/analyze`; Task 4.2's fallback and/or Task 4.3's error-handling
 policy should decide whether/how to catch it.
 
-`engine_node` remains a stub matching Task 2.1's original fixed response
-contract (Task 4.3) — it does not yet consume `regex_findings`/
-`ner_entities`/`vector_matches`/`categories`, so `/analyze`'s external
-response is still byte-identical to before; only the internal state keys
-now hold real data for downstream tasks to consume.
+Task 4.3 status: `engine_node` invokes the deterministic `calculate_risk()`
+engine and returns its authoritative decision. Task 5.1 adds a standalone
+span sanitizer; enforcement and forwarding remain Task 5.2's scope.
+
+Task 7.1 status: `PipelineState` gains an optional `policy_config` input
+key, forwarded straight into `calculate_risk(..., policy_config=...)`.
+This node does no fetching/caching itself — node-gateway owns the live
+Mongo read + TTL cache and simply includes `policy_config` in the
+`/analyze` POST body when it has one; absent/None falls back to
+risk_engine.py's hardcoded defaults exactly as before this task.
+
+Task 7.2 status: `calculate_risk()`'s return shape gained `flags` and
+`rewrite_guidance` (two-tier action policy — see risk_engine.py's module
+docstring for the full rule table). `engine_node` passes both straight
+through into pipeline state under the same field names `main.py`'s
+`AnalyzeResponse` now exposes.
 """
 
 import os
@@ -45,13 +56,19 @@ from .categorizer.groq_categorizer import classify_groq
 from .detectors.regex_detector import detect_regex
 from .detectors.ner_detector import detect_entities
 from .detectors.vector_detector import search_company_context
-from .risk_engine import VECTOR_SIMILARITY_FLOOR, calculate_risk
+from .risk_engine import VECTOR_SIMILARITY_FLOOR, NER_CONFIDENCE_FLOOR, calculate_risk
 
 
 class PipelineState(TypedDict, total=False):
     # --- input ---
     request_id: str
     prompt: str
+    # Task 7.1: optional live policy document (thresholds + category_weights)
+    # fetched by node-gateway from MongoDB and forwarded in the /analyze
+    # request body. None/absent when Mongo is unreachable or unseeded —
+    # engine_node falls back to risk_engine.py's hardcoded defaults, never
+    # hard-fails a request over a missing policy doc.
+    policy_config: dict
 
     # --- parallel detector stage (Phase 3 fills these in for real) ---
     # Distinct keys per detector so the three parallel nodes never write
@@ -77,6 +94,8 @@ class PipelineState(TypedDict, total=False):
     action: str
     result_categories: List[str]
     detectors_fired: List[str]
+    flags: List[dict]  # Task 7.2/7.3: [{category, message}], populated on SANITIZE/ALLOW+flag
+    rewrite_guidance: str | None  # Task 7.2/7.3: populated only on BLOCK
 
 
 def regex_node(state: PipelineState) -> dict:
@@ -90,7 +109,13 @@ def ner_node(state: PipelineState) -> dict:
     # Task 3.2: real NER extraction. Entities carry only spans/types/
     # confidence — never raw matched text (project.md constraint), and no
     # severity — extraction only, danger judgment is downstream (Phase 4).
-    entities = detect_entities(state.get("prompt", ""))
+    # Discard noisy model guesses before they enter any downstream evidence
+    # path (categorizer, score/action engine, or sanitizer).  A low-confidence
+    # label such as an acronym tagged ORG must not cause visible masking.
+    entities = [
+        entity for entity in detect_entities(state.get("prompt", ""))
+        if entity.confidence >= NER_CONFIDENCE_FLOOR
+    ]
     return {"ner_entities": [e.to_dict() for e in entities]}
 
 
@@ -105,10 +130,9 @@ def vector_node(state: PipelineState) -> dict:
 
 
 def merge_node(state: PipelineState) -> dict:
-    # Stub only — real merge logic (Phase 4) will normalize/dedupe across
-    # detectors to avoid double-counting the same category. Here it just
-    # concatenates whatever the (currently always-empty) stub lists hold,
-    # so the shape is exercised without inventing real merge semantics.
+    # Evidence stays as detector-native metadata. Risk-category normalization
+    # and deduplication occur in the deterministic engine, where weights are
+    # applied exactly once per category.
     merged = (
         state.get("regex_findings", [])
         + state.get("ner_entities", [])
@@ -131,22 +155,40 @@ def categorizer_node(state: PipelineState) -> dict:
     # hypothetical), fall through to Groq. If Groq also raises
     # CategorizerUnavailableError, let it propagate — both providers being
     # down must surface as a real failure, never silently swallowed as SAFE.
-    provider = os.getenv("RISK_MODEL_PROVIDER", "local")
+    provider = os.getenv("RISK_MODEL_PROVIDER", "local").strip().lower()
     evidence = state.get("merged_evidence", [])
 
-    if provider == "groq":
-        result, provider_used = classify_groq(evidence), "groq"
-    else:
-        try:
-            result, provider_used = classify_local(evidence), "local_llm"
-        except CategorizerUnavailableError:
-            result, provider_used = classify_groq(evidence), "groq"
+    try:
+        if provider == "groq":
+            try:
+                result, provider_used = classify_groq(evidence), "groq"
+            except CategorizerUnavailableError:
+                result, provider_used = classify_local(evidence), "local_llm"
+        else:
+            try:
+                result, provider_used = classify_local(evidence), "local_llm"
+            except CategorizerUnavailableError:
+                result, provider_used = classify_groq(evidence), "groq"
+    except CategorizerUnavailableError:
+        # Last-resort safety: if neither provider is reachable, degrade to a
+        # conservative unknown classification rather than crashing the whole /analyze
+        # request and disconnecting the caller.
+        result = type("_FallbackResult", (), {"categories": [type("_FallbackCategory", (), {"to_dict": lambda self: {"category": "UNKNOWN", "confidence": 0.5, "evidence": "categorizer unavailable"}})()]})()
+        provider_used = "fallback_unknown"
 
     return {"categories": [c.to_dict() for c in result.categories], "categorizer_provider": provider_used}
 
 
 def engine_node(state: PipelineState) -> dict:
-    result = calculate_risk(state.get("categories", []), evidence=state.get("merged_evidence", []))
+    # Task 7.1: policy_config is whatever node-gateway forwarded (live Mongo
+    # read, cached there) or absent entirely — calculate_risk() already
+    # falls back to DEFAULT_CATEGORY_WEIGHTS/DEFAULT_THRESHOLDS on None,
+    # this node does no additional fallback logic of its own.
+    result = calculate_risk(
+        state.get("categories", []),
+        evidence=state.get("merged_evidence", []),
+        policy_config=state.get("policy_config"),
+    )
     detectors_fired = []
     if state.get("regex_findings"):
         detectors_fired.append("regex")
@@ -156,15 +198,14 @@ def engine_node(state: PipelineState) -> dict:
         detectors_fired.append("vector")
     if state.get("categories"):
         detectors_fired.append(state.get("categorizer_provider", "local_llm"))
-    # Stub only — Task 4.3 implements calculate_risk(category_results).
-    # Values here intentionally match Task 2.1's original hardcoded
-    # AnalyzeResponse defaults exactly, preserving /analyze's contract.
     return {
         "risk_score": result.score,
         "risk_level": result.level,
         "action": result.action,
         "result_categories": result.categories,
         "detectors_fired": detectors_fired,
+        "flags": [f.to_dict() for f in result.flags],
+        "rewrite_guidance": result.rewrite_guidance,
     }
 
 

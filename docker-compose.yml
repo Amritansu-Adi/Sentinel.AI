@@ -18,6 +18,9 @@ services:
       - "4000:4000"
     env_file:
       - .env
+    environment:
+      DETECTION_SERVICE_URL: http://python-detection:8000
+      MONGODB_URI: mongodb://mongodb:27017/sentinelai
     depends_on:
       - mongodb
       - python-detection
@@ -28,6 +31,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
 
   mongodb:
     image: mongo:7

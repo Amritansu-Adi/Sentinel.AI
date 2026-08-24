@@ -20,12 +20,13 @@ class CompanyDoc(TypedDict):
     content: str
 
 
-# 8 synthetic docs — deliberately varied classification levels so
-# `search_company_context` callers (Task 4.x categorizer) can eventually
-# weight CONFIDENTIAL hits higher than INTERNAL ones. Content is short
-# (1-3 sentences) since embedding quality for this task only needs to be
-# "good enough to retrieve the right doc for an obviously-related query",
-# not production-grade semantic search.
+# 10 synthetic docs (8 original + 2 added in Task 7.4) — deliberately
+# varied classification levels so `search_company_context` callers
+# (categorizer + two-tier action policy) can distinguish CONFIDENTIAL
+# hits (strict-block tier) from INTERNAL ones (flag-and-allow tier).
+# Content is short (1-3 sentences) since embedding quality for this task
+# only needs to be "good enough to retrieve the right doc for an
+# obviously-related query", not production-grade semantic search.
 COMPANY_DOCS: list[CompanyDoc] = [
     {
         "doc_id": "proj-aurora",
@@ -111,6 +112,39 @@ COMPANY_DOCS: list[CompanyDoc] = [
             "A summary of the company's public press kit, including founding "
             "year, mission statement, and logo usage guidelines for media "
             "outlets. No restricted information is contained here."
+        ),
+    },
+    {
+        # Task 7.4: added per project.md §4 — the seeded set previously had
+        # no doc covering "who's on this project / who are we selling to"
+        # detail, so a prompt asking about internal team/client structure
+        # had nothing CONFIDENTIAL to match against and could slip past
+        # Tier 1 of the two-tier action policy undetected.
+        "doc_id": "team-roster",
+        "title": "Internal Team & Client Roster",
+        "classification": "CONFIDENTIAL",
+        "content": (
+            "This roster lists internal reporting lines across engineering, "
+            "sales, and operations, along with named client and partner "
+            "accounts currently under contract. Team assignments, account "
+            "ownership, and client contact details here are restricted to "
+            "internal use and must never be shared outside the company."
+        ),
+    },
+    {
+        # Task 7.4: added per project.md §4 — a realistic INTERNAL-tier
+        # example distinct from the CONFIDENTIAL docs above, matching
+        # Tier 2b (flag-and-allow) of the two-tier action policy rather
+        # than Tier 1 (strict block).
+        "doc_id": "ai-usage-policy",
+        "title": "AI Tool Usage & Data Handling Policy",
+        "classification": "INTERNAL",
+        "content": (
+            "This policy defines what employees may and may not paste into "
+            "external AI tools such as ChatGPT, Claude, or Gemini, including "
+            "guidance on customer data, credentials, and unreleased product "
+            "details. It also explains how SentinelAI's gateway enforces "
+            "these rules automatically for company-managed AI access."
         ),
     },
 ]

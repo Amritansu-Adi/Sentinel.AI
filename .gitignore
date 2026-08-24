@@ -5,6 +5,14 @@
 *.pem
 *.key
 
+# Internal/local-only files
+.internal/
+internal/
+**/.internal/
+**/internal/
+*.internal
+
+
 # Python
 __pycache__/
 *.py[cod]
@@ -60,3 +68,6 @@ Desktop.ini
 *.tar.gz
 tmp/
 temp/
+
+#project internal files
+project_internal/

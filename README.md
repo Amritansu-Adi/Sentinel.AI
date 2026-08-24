@@ -1,12 +1,14 @@
 <div align="center">
 
 ```text
+
 ███████╗███████╗███╗   ██╗████████╗██╗███╗   ██╗███████╗██╗      █████╗ ██╗
 ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██║████╗  ██║██╔════╝██║     ██╔══██╗██║
 ███████╗█████╗  ██╔██╗ ██║   ██║   ██║██╔██╗ ██║█████╗  ██║     ███████║██║
 ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██║╚██╗██║██╔══╝  ██║     ██╔══██║██║
 ███████║███████╗██║ ╚████║   ██║   ██║██║ ╚████║███████╗███████╗██║  ██║██║
 ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝
+
 ```
 
 # Sentinel.AI
@@ -115,7 +117,10 @@ Traditional DLP systems are not designed specifically around LLM traffic and con
 
 **Sentinel.AI adds an intelligent policy checkpoint between the user and the external LLM.**
 
----
+- A vector match classified `CONFIDENTIAL` at or above the similarity floor is `BLOCK`.
+- Regex or sufficiently confident NER findings are masked and forwarded as `SANITIZE`.
+- Internal vector matches and non-spannable categorizer findings are forwarded as `ALLOW` with an advisory flag.
+- Requests with no evidence are `ALLOW` with no flag.
 
 # Core Architecture
 
@@ -670,7 +675,7 @@ git clone https://github.com/Amritansu-Adi/Sentinel.AI.git
 cd Sentinel.AI
 ```
 
----
+Run the focused checks:
 
 ## Start Infrastructure
 
