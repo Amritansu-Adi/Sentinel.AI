@@ -1,0 +1,53 @@
+# ⚠️ RECONSTRUCTED FILE — SEE HANDOVER §6 BEFORE TRUSTING THIS
+#
+# The real docker-compose.yml from Task 1.1 was NOT included in the bundle
+# handed to this agent (only node-gateway.tar.gz + handover.md + project.md
+# were provided). This file was rebuilt from project.md's service list,
+# ports, and env var table, plus the node-gateway/mongodb/ollama services
+# the handover said already existed. It has NEVER been run (no docker
+# binary in this sandbox — see handover §4/§6).
+#
+# ACTION REQUIRED: diff this against your real docker-compose.yml (if it
+# differs from Task 1.1's actual output) and reconcile before running.
+# The only intentionally NEW block here is `python-detection`.
+
+services:
+  node-gateway:
+    build: ./node-gateway
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      DETECTION_SERVICE_URL: http://python-detection:8000
+      MONGODB_URI: mongodb://mongodb:27017/sentinelai
+    depends_on:
+      - mongodb
+      - python-detection
+
+  python-detection:
+    build: ./python-detection
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  mongo_data:
+  ollama_data:
